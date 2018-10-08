@@ -38,9 +38,11 @@ import java.util.Map;
 public class MapsActivity extends AppCompatActivity implements OnMapReadyCallback
 {
     private Context context = MapsActivity.this;
+    //
     private GoogleMap mMap;
     private AppCompatTextView tvDistancia;
     private AppCompatTextView tvArea;
+    //
     private ArrayList<Marker> listMarker = new ArrayList<>();
     private ArrayList<LatLng> listPontos = new ArrayList<>();
     private Marker myLocation;
@@ -56,6 +58,9 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     {
         super.onCreate(savedInstanceState);
         //
+        /**
+         * Só configura a tela se possuir as permissões
+         */
         if (verificaPermissoesNecessarias())
         {
             iniciaAplicacao();
@@ -64,38 +69,62 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private boolean verificaPermissoesNecessarias()
     {
+        /**
+         * Verifica se o app tem as permissões necessárias para utilizar o sistema
+         */
         ArrayList<String> permissoesNecessarias = new ArrayList<>();
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED)
             permissoesNecessarias.add(Manifest.permission.ACCESS_FINE_LOCATION);
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED)
             permissoesNecessarias.add(Manifest.permission.ACCESS_COARSE_LOCATION);
 
+        /**
+         * Se já possui todas, retorna true
+         */
         if (permissoesNecessarias.size() <= 0)
             return true;
         else
         {
+            /**
+             * Se não possui todas, chama método responsável por solicitar as permissões
+             */
             String[] permissoes = new String[permissoesNecessarias.size()];
             ActivityCompat.requestPermissions(MapsActivity.this, permissoesNecessarias.toArray(permissoes), REQUEST_PERMISSOES);
             return false;
         }
     }
 
+    /**
+     * Método disparado após solicitar permissões. Funcionamento pareceido com o OnActivityResult
+     * @param requestCode
+     * @param permissions
+     * @param grantResults
+     */
     @Override
     public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults)
     {
         switch (requestCode)
         {
             case REQUEST_PERMISSOES:
+                /**
+                 * Verifica se todas as permissões foram autorizadas
+                 */
                 for (int result : grantResults)
                 {
                     if (result != PackageManager.PERMISSION_GRANTED)
                     {
+                        /**
+                         * Se alguma permissão não foi autorizada, avisa o usuário e fecha a tela
+                         */
                         Toast.makeText(context, R.string.FalhaPermissoes, Toast.LENGTH_LONG).show();
                         finish();
                         return;
                     }
                 }
                 //
+                /**
+                 * Se todas as permissões foram dadas, continuar normalmente
+                 */
                 iniciaAplicacao();
                 break;
         }
@@ -104,9 +133,15 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     private void iniciaAplicacao()
     {
         setContentView(R.layout.activity_maps);
-        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.mMap);
         //
-        mapFragment.getMapAsync(this);
+        /**
+         * Inicia referência para o mapa
+         */
+        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.mMap);
+        if (mapFragment != null)
+        {
+            mapFragment.getMapAsync(this);
+        }
         //
         tvArea = findViewById(R.id.tvArea);
         tvDistancia = findViewById(R.id.tvDistancia);
@@ -115,64 +150,87 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     }
 
+    /**
+     * Método disparado quando o mapa está pronto para ser utilizado
+     * @param googleMap
+     */
     @Override
     public void onMapReady(GoogleMap googleMap)
     {
         mMap = googleMap;
+        // Configura o tipo do mapa
         mMap.setMapType(GoogleMap.MAP_TYPE_HYBRID);
+        // Adiciona evento para o click do mapa
         mMap.setOnMapClickListener(new GoogleMap.OnMapClickListener()
         {
             @Override
             public void onMapClick(LatLng position)
             {
+                // A cada click um marcador é adicionado e é refeito o controle dos tipos de objetos exibidos e também dos calculos
                 listPontos.add(position);
                 adicionaMarcador(position);
                 controlaObjeto();
                 calculaMedidas();
             }
         });
+        // Adiciona evento para o click nos marcadores
         mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener()
         {
             @Override
             public boolean onMarkerClick(Marker marker)
             {
+                //Verifica se é o marcador de posição e se for não faz nada
                 if (marker.equals(myLocation))
                     return true;
-                //
+                // Se não for, remover o marcador e refaz os calculos
                 removeMarker(marker);
                 calculaMedidas();
                 return true;
             }
         });
+        // Adiciona evento para o click nos polígonos
         mMap.setOnPolygonClickListener(new GoogleMap.OnPolygonClickListener()
         {
             @Override
             public void onPolygonClick(Polygon polygon)
             {
+                // Quando clicado, o poligono é removido
                 removePolygon();
             }
         });
+        // Adiciona evento para o click na linhas
         mMap.setOnPolylineClickListener(new GoogleMap.OnPolylineClickListener()
         {
             @Override
             public void onPolylineClick(Polyline polyline)
             {
+                //Quando clicada a linha é removida
                 removePolyline();
             }
         });
     }
 
-
+    /**
+     * Cria o marcador para a posição.
+     * @param position
+     */
     private void adicionaMarcador(LatLng position)
     {
         MarkerOptions markerOptions = new MarkerOptions();
+        //Seta um ícone
         markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED));
+        //Seta a posição
         markerOptions.position(position);
+        //Seta se o marcador pode ser arrastado
         markerOptions.draggable(false);
+        //Adiciona um novo marcador no mapa
         Marker marker = mMap.addMarker(markerOptions);
         listMarker.add(marker);
     }
 
+    /**
+     * Cria os objetos no mapa. Se possui 2 pontos, cria-se panes uma linha. Se possuir mais de 2 pontos, cria0-se um poligono
+     */
     private void controlaObjeto()
     {
         if (listMarker.size() > 2)
@@ -186,10 +244,15 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             if (mPolygon == null)
             {
                 PolygonOptions polygonOptions = new PolygonOptions();
+                //Adiciona todos os pontos ao poligono
                 polygonOptions.addAll(listPontos);
+                //Define a cor da linha
                 polygonOptions.strokeColor(Color.BLACK);
+                //Define a cor de preenchimento
                 polygonOptions.fillColor(Color.WHITE);
+                // Define a espessura
                 polygonOptions.strokeWidth(3);
+                // Define se é clicavel
                 polygonOptions.clickable(true);
                 mPolygon = mMap.addPolygon(polygonOptions);
             }
@@ -207,9 +270,13 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             }
             //
             PolylineOptions polylineOptions = new PolylineOptions();
+            //Adiciona todos os pontos ao poligono
             polylineOptions.addAll(listPontos);
+            //Define a cor da linha
             polylineOptions.color(Color.BLACK);
+            // Define a espessura
             polylineOptions.width(3);
+            // Define se é clicavel
             polylineOptions.clickable(true);
             mPolyline = mMap.addPolyline(polylineOptions);
         }
@@ -225,6 +292,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private void removePolyline()
     {
+        // Remove linha
         mPolyline.remove();
         mPolyline = null;
         limpaMarcadores();
@@ -233,6 +301,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private void removePolygon()
     {
+        //Remove poligono
         mPolygon.remove();
         mPolygon = null;
         limpaMarcadores();
@@ -241,6 +310,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private void limpaMarcadores()
     {
+        //Remove marcadores
         for (Marker marker : listMarker)
         {
             marker.remove();
@@ -259,6 +329,9 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private void calculaMedidas()
     {
+        /**
+         * Calcula distancia de todos os pontos e soma
+         */
         double distancia = 0.0;
         if (listMarker.size() > 1)
         {
@@ -272,12 +345,14 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 markerAnterior = marker;
             }
         }
-        //
         if (distancia > 0)
             tvDistancia.setText("Distância: " + String.valueOf(distancia) + "m");
         else
             tvDistancia.setText("");
         //
+        /**
+         * Calcula área do polígono
+         */
         double area = SphericalUtil.computeArea(listPontos);
         if (area > 0)
             tvArea.setText("Área: " + String.valueOf(area) + "m2");
@@ -285,36 +360,49 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             tvArea.setText("");
     }
 
+    /**
+     * Objeto responsável por receber as atualizações de localização
+     */
     private LocationCallback mLocationCallback = new LocationCallback()
     {
         @Override
         public void onLocationResult(LocationResult locationResult)
         {
             if (locationResult == null)
-            {
                 return;
-            }
+            //Utiliza a última posição válida
             atualizaMeuLocal(locationResult.getLastLocation());
         }
     };
 
     private void iniciaLeituraGPS()
     {
+        /**
+         * Configura a solicitação
+         */
         LocationRequest mLocationRequest = new LocationRequest();
+        // Intervalo mínimo de 1000 milisegundo para a solicitação explícita
         mLocationRequest.setInterval(1000);
+        // Intervalo mínimo de 1000 milisegundos para a solicitação implícita
         mLocationRequest.setFastestInterval(1000);
+        // Configura como máxima prioridade
         mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-        //
+        // Pega instância do provider de localização (responsável por fazer o tratamento de localização e uso dos hardwares responsáveis
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-        //
+        // Confirma se o app possui as permissões necessárias
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED)
-        {
             return;
-        }
         //
+        // Registra a solicitação passando as configurações e o responsável por receber as informações atualizadas
         mFusedLocationClient.requestLocationUpdates(mLocationRequest, mLocationCallback, null);
     }
 
+
+    /**
+     * Cria um marcador para representar a posição atual
+     * Só cria se já não existir, caso contrário, apenas atualiza posição do marcador
+     * @param lastLocation
+     */
     private void atualizaMeuLocal(Location lastLocation)
     {
         if (myLocation == null)
@@ -328,5 +416,12 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         else
             myLocation.setPosition(new LatLng(lastLocation.getLatitude(), lastLocation.getLongitude()));
 
+    }
+
+    @Override
+    protected void onDestroy()
+    {
+        super.onDestroy();
+        mFusedLocationClient.removeLocationUpdates(mLocationCallback);
     }
 }
